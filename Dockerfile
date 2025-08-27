@@ -1,24 +1,27 @@
-FROM python:3.8
+# Set the base image for the new image
+FROM jenkins/jenkins:lts-jdk17
 
-# Create a folder /app if it doesn't exist,
-# the /app folder is the current working directory
-WORKDIR /app
+# Set the current user to root for privileged operations
+USER root
 
-# Copy necessary files to our app
-COPY ./main.py /app
+# Update package list and install dependencies
+RUN apt-get update && \
+    apt-get install -y apt-transport-https \
+    ca-certificates \
+    curl \
+    gnupg2 \
+    software-properties-common
 
-COPY ./requirements.txt /app
+# Add Docker's official GPG key and repository (DEBIAN version)
+RUN curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg && \
+    echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/debian $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
 
-COPY ./models /app/models
+# Update package list with Docker repo and install Docker
+RUN apt-get update && \
+    apt-get install -y docker-ce docker-ce-cli containerd.io
 
-# Set MODEL_DIR env variable
-ENV MODEL_PATH /app/models/model.pkl
+# Add Jenkins user to Docker group
+RUN usermod -aG docker jenkins
 
-# Port will be exposed, for documentation only
-EXPOSE 30000
-
-# Disable pip cache to shrink the image size a little bit,
-# since it does not need to be re-installed
-RUN pip install -r requirements.txt --no-cache-dir
-
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "30000"]
+# Switch back to Jenkins user for security
+USER jenkins
